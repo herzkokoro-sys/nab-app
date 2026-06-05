@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>NAB案件登録（練習）</title>
+</head>
+<body>
+
+  <h1>NAB 案件登録</h1>
+
+  <!-- 入力欄 -->
+  <p>
+    図面番号：<input type="text" id="zuban">
+  </p>
+  <p>
+    製品名：<input type="text" id="hinmei">
+  </p>
+
+  <!-- 操作ボタン -->
+  <button id="addBtn">登録</button>
+
+  <!-- 一覧表示エリア -->
+  <h2>登録一覧</h2>
+  <div id="list"></div>
+
+  <!-- jQuery 読み込み（自分のコードより必ず上！） -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+  <script>
+      $("#addBtn").on("click", function () {
+      // 入力欄の値を取得
+      const zuban = $("#zuban").val();
+      const hinmei = $("#hinmei").val();
+
+      // 入力チェック：どちらかが空なら登録しない
+      if (zuban === "" || hinmei === "") {
+        alert("図番と品名を両方入力してください");
+        return;
+      }
+
+      // チェックを通過したら一覧に表示
+      $("#list").text("図番：" + zuban + " ／ 品名：" + hinmei);
+    });
+  </script>
+
+
+
+
+</body>
+</html>

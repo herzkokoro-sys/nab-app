@@ -1,0 +1,9 @@
+# 社外秘・授業資料はGitHubに上げない
+*.pdf
+*.docx
+*.xlsm
+NABシステム構造_メモ.md
+NAB実績検索_アプリ仕様書.md
+lecture01_js.md
+lecture02_js.md
+lecture03_js.md
