@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NAB 請書（Phase 1）</title>
+</head>
+
+<body>
+
+  <h1>NAB 請書 登録（Phase 1）</h1>
+
+  <!-- =========================================================
+       入力欄（送信に使う部分）
+       ・あとで JavaScript から値を取るので、各入力欄に id を付ける
+       ・授業のチャットでいう name / text にあたるのが、ここの各欄
+       ========================================================= -->
+  <form>
+    <fieldset>
+      <legend>請書 入力</legend>
+
+      <!-- 【全製品で共通する情報】 -->
+      <div>顧客名：<input type="text" id="kokyaku" /></div>
+      <div>担当者名：<input type="text" id="tantou" /></div>
+      <div>件名：<input type="text" id="kenmei" /></div>
+      <div>納期：<input type="date" id="nouki" /></div>
+
+      <!-- 【各製品ごとの情報】（Phase 1 では1件＝1製品ぶん） -->
+      <div>図番：<input type="text" id="zuban" /></div>
+      <div>品名：<input type="text" id="hinmei" /></div>
+      <div>個数：<input type="number" id="kosu" /></div>
+      <div>単価：<input type="number" id="tanka" /></div>
+      <div>合計単価：<input type="number" id="goukei" /></div>
+
+      <div>
+        <button type="button" id="addBtn">登録</button>
+      </div>
+    </fieldset>
+  </form>
+
+  <!-- =========================================================
+       一覧表示エリア（受信＝リアルタイム表示に使う部分）
+       ・中身はまだ空。あとで onSnapshot が変化を検知して、
+         ここに最新の請書一覧を流し込む。
+       ========================================================= -->
+  <h2>請書 一覧</h2>
+  <div id="seisho_list"></div>
+
+  <!-- jQuery（自分のコードより必ず上で読み込む） -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+  <!-- =========================================================
+       ここから下に、これから JavaScript を書いていく。
+       授業と同じ順番：
+         ① Firebase の準備（config と db）
+         ② 送信処理（登録ボタン → addDoc）
+         ③ 取得・変換・表示（onSnapshot → 変換関数 → タグ生成 → 表示）
+         ④ 機能追加（日時の整形・新しい順に並べ替え）
+       ※ ②③④ は次のステップで一緒に書く
+       ========================================================= -->
+  <script type="module">
+    // ① Firebase の準備 ------------------------------------------------
+    // 必要な機能を読み込む（initializeApp = アプリ起動 / getFirestore = DB接続）
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      serverTimestamp,
+      onSnapshot,
+    } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+    // Firebase の接続情報（あなたのプロジェクト nab-seisho のもの）
+    const firebaseConfig = {
+      
+      authDomain: "nab-seisho.firebaseapp.com",
+      projectId: "nab-seisho",
+      storageBucket: "nab-seisho.firebasestorage.app",
+      messagingSenderId: "439265702063",
+      appId: "1:439265702063:web:93f0e2aa173ed37a3e245a"
+    };
+
+    // Firebase を起動し、データベース(db)につなぐ
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app); // ← この db に対して、これから追加(addDoc)や取得(onSnapshot)を行う
+
+    // ② 送信処理（登録ボタン → addDoc）------------------------------
+    $("#addBtn").on("click", function () {
+      // 1. 入力した値を id 指定で取り出し、1件ぶんのオブジェクトにまとめる
+      const postData = {
+        kokyaku: $("#kokyaku").val(),       // 顧客名
+        tantou: $("#tantou").val(),         // 担当者名
+        kenmei: $("#kenmei").val(),         // 件名
+        nouki: $("#nouki").val(),           // 納期（共通）
+        zuban: $("#zuban").val(),           // 図番
+        hinmei: $("#hinmei").val(),         // 品名
+        kosu: Number($("#kosu").val()),     // 個数（数値に変換）
+        tanka: Number($("#tanka").val()),   // 単価（数値に変換）
+        goukei: Number($("#goukei").val()), // 合計単価（数値に変換）
+        time: serverTimestamp(),            // 登録日時（Firestoreが自動で付ける）
+      };
+
+      // 2. db の中の「seisho」コレクションに、この1件を追加する
+      addDoc(collection(db, "seisho"), postData);
+
+      // 3. 入力欄をクリア
+      $("#kokyaku").val("");
+      $("#tantou").val("");
+      $("#kenmei").val("");
+      $("#nouki").val("");
+      $("#zuban").val("");
+      $("#hinmei").val("");
+      $("#kosu").val("");
+      $("#tanka").val("");
+      $("#goukei").val("");
+    });
+
+    // ③ 取得・変換・表示（onSnapshot → 変換 → タグ生成 → 表示）-------
+
+    // 【3b・変換関数】Firestore形式の複雑なデータ → 自分が扱いやすい配列に変換する
+    //   引数: firestoreDocs（複雑な箱の配列） / 戻り値: 素直なオブジェクトの配列
+    function seishoDocuments(firestoreDocs) {    // 引数：複雑な箱の配列を、firestoreDocs という名前で受け取る）
+      const documents = []; // 空の配列を用意      
+      firestoreDocs.forEach(function (doc) {  // 複雑な箱を1件ずつ取り出し、その1件を doc と呼ぶ（件数ぶん繰り返す）
+        documents.push({                      // 整理した1件を、空っぽの箱に後ろから追加する
+          id: doc.id,                         // その1件のID（Firestoreが自動でつけた文字列）を取り出す
+          data: doc.data(),                    // その1件の中身（顧客名や図番など）を取り出す ※カッコ付きで呼ぶ決まり
+        });
+      });
+      return documents;                       // 完成した配列を返す
+    }
+
+    // 【3c・タグ生成関数】素直な配列 → 画面表示用のHTMLタグ（文字列）の配列に変える
+    //   引数: documents（素直な配列） / 戻り値: 表示用タグが並んだ配列
+    function seishoElements(documents) {        // 引数：さっき変換した素直な配列を受け取る
+      const elements = [];                      // タグ（文字列）を入れる空っぽの箱を用意
+      documents.forEach(function (document) {   // 1件ずつ取り出し、その1件を document と呼ぶ
+        elements.push(`
+          <div id="${document.id}">
+            <p>件名：${document.data.kenmei}（${document.data.kokyaku} / ${document.data.tantou}）</p>
+            <p>図番：${document.data.zuban}　品名：${document.data.hinmei}</p>
+            <p>個数：${document.data.kosu}　単価：${document.data.tanka}　合計：${document.data.goukei}</p>
+            <p>納期：${document.data.nouki}</p>
+            <hr>
+          </div>
+        `);                                     // 1件ぶんのタグを作って、箱に追加
+      });
+      return elements;                          // 完成したタグの配列を返す
+    }
+
+    // 【取得】seishoコレクションを見張り、変わるたびに最新データを受け取る
+    onSnapshot(collection(db, "seisho"), (querySnapshot) => {   // 変化が起きた瞬間の全データを querySnapshot で受け取る
+      const documents = seishoDocuments(querySnapshot.docs); // ① 生データ → 素直な配列に変換
+      const elements = seishoElements(documents);            // ② 素直な配列 → 表示用タグの配列に変換
+      $("#seisho_list").html(elements);                      // ③ 画面の「請書 一覧」エリアに流し込む
+    });
+  </script>
+
+</body>
+
+</html>
